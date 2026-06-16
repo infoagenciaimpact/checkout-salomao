@@ -586,7 +586,13 @@
       const res = await fetch('/criar-pix', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(mpBody)
+        body: JSON.stringify({
+          valor: PRODUTO_VALOR,
+          email: email,
+          primeiro_nome: nome.split(' ')[0],
+          ultimo_nome: nome.split(' ').slice(1).join(' ') || nome.split(' ')[0],
+          cpf: cpf.replace(/\D/g,'')
+        })
       });
 
       const data = await res.json();

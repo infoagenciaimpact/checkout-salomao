@@ -10,114 +10,76 @@ const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  if (req.method === 'OPTIONS') {
-    res.writeHead(200);
-    res.end();
-    return;
-  }
+  if (req.method === 'OPTIONS') { res.writeHead(200); res.end(); return; }
 
-  // Serve o HTML em qualquer rota que não seja API
-  if (req.url === '/' || req.url === '/index.html' || (!req.url.startsWith('/criar-pix') && !req.url.startsWith('/consultar-pix'))) {
-    try {
-      const htmlPath = path.join(__dirname, 'index.html');
-      console.log('Serving HTML from:', htmlPath);
-      const html = fs.readFileSync(htmlPath);
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end(html);
-    } catch(e) {
-      console.error('Error reading HTML:', e.message);
-      res.writeHead(500);
-      res.end('Error: ' + e.message);
-    }
-    return;
-  }
+  const url = req.url.split('?')[0];
 
   // Criar PIX
-  if (req.url === '/criar-pix' && req.method === 'POST') {
+  if (url === '/criar-pix' && req.method === 'POST') {
     let body = '';
     req.on('data', chunk => body += chunk);
     req.on('end', () => {
-      try {
-        const { valor, email, primeiro_nome, ultimo_nome, cpf } = JSON.parse(body);
-
-        const payload = JSON.stringify({
-          transaction_amount: Number(valor),
-          description: 'Black Namaste - Transformacao Completa',
-          payment_method_id: 'pix',
-          payer: {
-            email,
-            first_name: primeiro_nome,
-            last_name: ultimo_nome || primeiro_nome,
-            identification: { type: 'CPF', number: cpf }
-          }
-        });
-
-        const options = {
-          hostname: 'api.mercadopago.com',
-          path: '/v1/payments',
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${MP_ACCESS_TOKEN}`,
-            'X-Idempotency-Key': `bkn_${Date.now()}`
-          }
-        };
-
-        const mpReq = https.request(options, (mpRes) => {
-          let data = '';
-          mpRes.on('data', c => data += c);
-          mpRes.on('end', () => {
-            console.log('MP Response:', data.substring(0, 200));
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(data);
-          });
-        });
-
-        mpReq.on('error', (e) => {
-          console.error('MP Error:', e.message);
-          res.writeHead(500, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: e.message }));
-        });
-
-        mpReq.write(payload);
-        mpReq.end();
-      } catch(e) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: e.message }));
-      }
+      const { valor, email, primeiro_nome, ultimo_nome, cpf } = JSON.parse(body);
+      const payload = JSON.stringify({
+        transaction_amount: Number(valor),
+        description: 'Black Namaste - Transformacao Completa',
+        payment_method_id: 'pix',
+        payer: {
+          email,
+          first_name: primeiro_nome,
+          last_name: ultimo_nome || primeiro_nome,
+          identification: { type: 'CPF', number: cpf }
+        }
+      });
+      const mpReq = https.request({
+        hostname: 'api.mercadopago.com',
+        path: '/v1/payments',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${MP_ACCESS_TOKEN}`,
+          'X-Idempotency-Key': `bkn_${Date.now()}`
+        }
+      }, (mpRes) => {
+        let data = '';
+        mpRes.on('data', c => data += c);
+        mpRes.on('end', () => { res.writeHead(200, {'Content-Type':'application/json'}); res.end(data); });
+      });
+      mpReq.on('error', (e) => { res.writeHead(500); res.end(JSON.stringify({error: e.message})); });
+      mpReq.write(payload);
+      mpReq.end();
     });
     return;
   }
 
   // Consultar PIX
-  if (req.url.startsWith('/consultar-pix') && req.method === 'GET') {
-    const id = new URL(req.url, 'http://localhost').searchParams.get('id');
-
-    const options = {
+  if (url === '/consultar-pix' && req.method === 'GET') {
+    const id = req.url.split('id=')[1];
+    const mpReq = https.request({
       hostname: 'api.mercadopago.com',
       path: `/v1/payments/${id}`,
       method: 'GET',
       headers: { 'Authorization': `Bearer ${MP_ACCESS_TOKEN}` }
-    };
-
-    const mpReq = https.request(options, (mpRes) => {
+    }, (mpRes) => {
       let data = '';
       mpRes.on('data', c => data += c);
-      mpRes.on('end', () => {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(data);
-      });
+      mpRes.on('end', () => { res.writeHead(200, {'Content-Type':'application/json'}); res.end(data); });
     });
-
-    mpReq.on('error', (e) => {
-      res.writeHead(500, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: e.message }));
-    });
-
+    mpReq.on('error', (e) => { res.writeHead(500); res.end(JSON.stringify({error: e.message})); });
     mpReq.end();
     return;
+  }
+
+  // Serve HTML
+  try {
+    const html = fs.readFileSync(path.join(__dirname, 'index.html'));
+    res.writeHead(200, {'Content-Type': 'text/html; charset=utf-8'});
+    res.end(html);
+  } catch(e) {
+    res.writeHead(500);
+    res.end('Erro: ' + e.message);
   }
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Servidor rodando na porta ${PORT}`));
+server.listen(PORT, () => console.log(`Rodando na porta ${PORT}`));

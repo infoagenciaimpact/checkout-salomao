@@ -213,15 +213,23 @@ function crc16(str) {
   return (crc & 0xFFFF).toString(16).toUpperCase().padStart(4,'0');
 }
 
-function pad(id, value) {
-  return id + String(value.length).padStart(2,'0') + value;
+function pad(tag, value) {
+  return tag + String(value.length).padStart(2,'0') + value;
+}
+
+function gerarTxid(len) {
+  var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  var result = '';
+  for (var i = 0; i < len; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
 }
 
 function gerarPix() {
-  var amount  = VALOR.toFixed(2);
-  var txid    = Math.random().toString(36).substring(2,15).toUpperCase();
-  var chave   = pad('01', PIX_KEY);
-  var gui     = pad('00', 'br.gov.bcb.pix') + chave;
+  var amount   = VALOR.toFixed(2);
+  var txid     = gerarTxid(14);
+  var gui      = pad('00', 'br.gov.bcb.pix') + pad('01', PIX_KEY);
   var merchant = pad('26', gui);
   var addData  = pad('62', pad('05', txid));
 
@@ -299,11 +307,8 @@ function mostrarPix(pixCode, email) {
   setTimeout(function() {
     if (typeof QRCode !== 'undefined') {
       new QRCode(document.getElementById('qrDiv'), {
-        text: pixCode,
-        width: 180,
-        height: 180,
-        colorDark: '#111',
-        colorLight: '#ffffff'
+        text: pixCode, width: 180, height: 180,
+        colorDark: '#111', colorLight: '#ffffff'
       });
     }
   }, 200);
@@ -314,21 +319,14 @@ function copiarPix() {
   if (navigator.clipboard) {
     navigator.clipboard.writeText(txt).then(function() {
       document.getElementById('btnCopiar').textContent = 'Copiado!';
-      setTimeout(function() {
-        document.getElementById('btnCopiar').textContent = 'Copiar codigo PIX';
-      }, 2500);
+      setTimeout(function() { document.getElementById('btnCopiar').textContent = 'Copiar codigo PIX'; }, 2500);
     });
   } else {
     var el = document.createElement('textarea');
-    el.value = txt;
-    document.body.appendChild(el);
-    el.select();
-    document.execCommand('copy');
-    document.body.removeChild(el);
+    el.value = txt; document.body.appendChild(el); el.select();
+    document.execCommand('copy'); document.body.removeChild(el);
     document.getElementById('btnCopiar').textContent = 'Copiado!';
-    setTimeout(function() {
-      document.getElementById('btnCopiar').textContent = 'Copiar codigo PIX';
-    }, 2500);
+    setTimeout(function() { document.getElementById('btnCopiar').textContent = 'Copiar codigo PIX'; }, 2500);
   }
 }
 
@@ -343,15 +341,11 @@ function closeModal() {
 
 function showErro(msg) {
   var conteudo = '<div style="padding:16px 0;text-align:center;">';
-  conteudo += '<div style="font-size:32px;margin-bottom:10px;">!</div>';
+  conteudo += '<div style="font-size:32px;margin-bottom:10px;">⚠️</div>';
   conteudo += '<div style="font-size:14px;font-weight:700;color:#e05252;margin-bottom:12px;">' + msg + '</div>';
   conteudo += '<button onclick="closeModal()" style="background:#c8820a;color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:14px;cursor:pointer;">OK</button>';
   conteudo += '</div>';
   abrirModal(conteudo);
-}
-
-function abrirWhatsapp() {
-  window.open('https://wa.me/' + WHATSAPP, '_blank');
 }
 </script>
 

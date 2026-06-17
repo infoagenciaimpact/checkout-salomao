@@ -192,159 +192,175 @@
   </div>
 </div>
 
-<!-- MODAL PIX -->
-<div id="pixModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:9999;align-items:center;justify-content:center;">
-  <div class="modal-box">
-    <button class="modal-close" onclick="closeModal()">✕</button>
-    <div id="modalContent"></div>
-  </div>
-</div>
+
 
 <script>
-  // ── CHAVE PIX ──────────────────────────────────
-  const PIX_KEY = 'efef7a15-8654-4b17-ba50-d516033f4347';
-  const PIX_NAME = 'Carol dos Cilios';
-  const PIX_CITY = 'SAO PAULO';
-  const VALOR = 247.00;
-  const WHATSAPP = '5511920096589';
+var PIX_KEY  = 'efef7a15-8654-4b17-ba50-d516033f4347';
+var PIX_NAME = 'CAROL DOS CILIOS';
+var PIX_CITY = 'SAO PAULO';
+var VALOR    = 247.00;
+var WHATSAPP = '5511920096589';
 
-  function crc16(str) {
-    let crc = 0xFFFF;
-    for (let i = 0; i < str.length; i++) {
-      crc ^= str.charCodeAt(i) << 8;
-      for (let j = 0; j < 8; j++) {
-        crc = (crc & 0x8000) ? ((crc << 1) ^ 0x1021) : (crc << 1);
-      }
+function crc16(str) {
+  var crc = 0xFFFF;
+  for (var i = 0; i < str.length; i++) {
+    crc ^= str.charCodeAt(i) << 8;
+    for (var j = 0; j < 8; j++) {
+      if (crc & 0x8000) { crc = (crc << 1) ^ 0x1021; }
+      else { crc = crc << 1; }
     }
-    return (crc & 0xFFFF).toString(16).toUpperCase().padStart(4, '0');
   }
+  return (crc & 0xFFFF).toString(16).toUpperCase().padStart(4,'0');
+}
 
-  function pad(id, value) {
-    return id + String(value.length).padStart(2, '0') + value;
-  }
+function pad(id, value) {
+  var len = String(value.length).padStart(2,'0');
+  return id + len + value;
+}
 
-  function gerarPayloadPix(valor) {
-    const pixKey    = pad('01', PIX_KEY);
-    const merchant  = pad('26', pad('00', 'BR.GOV.BCB.PIX') + pixKey);
-    const name      = PIX_NAME.substring(0, 25).toUpperCase();
-    const city      = PIX_CITY.substring(0, 15).toUpperCase();
-    const amount    = parseFloat(valor).toFixed(2);
+function gerarPix() {
+  var amount  = VALOR.toFixed(2);
+  var chave   = pad('01', PIX_KEY);
+  var gui     = pad('00', 'BR.GOV.BCB.PIX') + chave;
+  var merchant = pad('26', gui);
+  var addData  = pad('62', pad('05', '***'));
 
-    let payload =
-      pad('00', '01') +
-      pad('01', '12') +
-      merchant +
-      pad('52', '0000') +
-      pad('53', '986') +
-      pad('54', amount) +
-      pad('58', 'BR') +
-      pad('59', name) +
-      pad('60', city) +
-      pad('62', pad('05', '***'));
+  var payload =
+    pad('00','01') +
+    pad('01','12') +
+    merchant +
+    pad('52','0000') +
+    pad('53','986') +
+    pad('54', amount) +
+    pad('58','BR') +
+    pad('59', PIX_NAME) +
+    pad('60', PIX_CITY) +
+    addData +
+    pad('63','0000');
 
-    payload += pad('63', '0000');
-    const checksum = crc16(payload);
-    return payload.slice(0, -4) + checksum;
-  }
+  var crc = crc16(payload);
+  return payload.slice(0, -4) + crc;
+}
 
-  function validarCPF(cpf) {
-    cpf = cpf.replace(/\D/g,'');
-    if (cpf.length !== 11 || /^(\d)\1+$/.test(cpf)) return false;
-    let soma = 0, resto;
-    for (let i=1;i<=9;i++) soma += parseInt(cpf[i-1])*(11-i);
-    resto = (soma*10)%11; if(resto===10||resto===11) resto=0;
-    if(resto!==parseInt(cpf[9])) return false;
-    soma=0;
-    for (let i=1;i<=10;i++) soma += parseInt(cpf[i-1])*(12-i);
-    resto=(soma*10)%11; if(resto===10||resto===11) resto=0;
-    return resto===parseInt(cpf[10]);
-  }
+function mascaraCPF(v) {
+  v = v.replace(/\D/g,'').substring(0,11);
+  v = v.replace(/(\d{3})(\d)/,'$1.$2');
+  v = v.replace(/(\d{3})(\d)/,'$1.$2');
+  v = v.replace(/(\d{3})(\d{1,2})$/,'$1-$2');
+  return v;
+}
 
-  // ── COMPRAR ────────────────────────────────────
-  function handleBuy() {
-    const nome = document.getElementById('nome').value.trim();
-    const email = document.getElementById('email').value.trim();
-    const email2 = document.getElementById('email2').value.trim();
-    const cpf = document.getElementById('cpf').value.trim();
-    const cel = document.getElementById('cel').value.trim();
+function mascaraCel(v) {
+  v = v.replace(/\D/g,'').substring(0,11);
+  v = v.replace(/^(\d{2})(\d)/,'($1) $2');
+  v = v.replace(/(\d{5})(\d)/,'$1-$2');
+  return v;
+}
 
-    if (!nome) return showErro('Por favor, preencha seu nome completo.');
-    if (!email || !email.includes('@')) return showErro('Por favor, informe um email válido.');
-    if (email !== email2) return showErro('Os emails não coincidem.');
-    if (!validarCPF(cpf)) return showErro('CPF inválido.');
-    if (cel.replace(/\D/g,'').length < 10) return showErro('Celular inválido.');
+document.getElementById('cpf').addEventListener('input', function() {
+  this.value = mascaraCPF(this.value);
+});
+document.getElementById('cel').addEventListener('input', function() {
+  this.value = mascaraCel(this.value);
+});
 
-    const payload = gerarPayloadPix(VALOR);
-    showPixModal(payload, email);
-  }
+function handleBuy() {
+  var nome   = document.getElementById('nome').value.trim();
+  var email  = document.getElementById('email').value.trim();
+  var email2 = document.getElementById('email2').value.trim();
+  var cpf    = document.getElementById('cpf').value.trim();
+  var cel    = document.getElementById('cel').value.trim();
 
-  // ── MODAL PIX ──────────────────────────────────
-  function showPixModal(payload, email) {
-    showModal(`
-      <div>
-        <div style="font-size:14px;font-weight:700;color:#111;margin-bottom:4px;">Pague com PIX</div>
-        <div style="font-size:12px;color:#888;margin-bottom:14px;">Escaneie o QR Code ou copie o código</div>
-        <div id="qrcode" style="display:flex;justify-content:center;margin-bottom:14px;"></div>
-        <div style="background:#f9f9f9;border-radius:8px;padding:10px;margin-bottom:12px;">
-          <div id="pixCodeText" style="font-size:9.5px;color:#555;word-break:break-all;max-height:55px;overflow:hidden;line-height:1.5;">${payload}</div>
-        </div>
-        <button onclick="copiarPix()" style="width:100%;background:#32bcad;color:#fff;border:none;border-radius:8px;padding:11px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:8px;" id="btnCopiar">📋 Copiar código PIX</button>
-        <button onclick="abrirWhatsapp()" class="btn-whats">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.123.554 4.112 1.524 5.84L0 24l6.324-1.499A11.934 11.934 0 0 0 12 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-1.9 0-3.68-.497-5.22-1.367l-.374-.222-3.753.889.938-3.658-.243-.388A9.933 9.933 0 0 1 2 12C2 6.477 6.477 2 12 2s10 4.477 10 10-4.477 10-10 10z"/></svg>
-          Suporte via WhatsApp
-        </button>
-        <div style="font-size:11px;color:#aaa;margin-top:8px;">Acesso enviado para: <strong style="color:#555;">${email}</strong></div>
-      </div>
-    `);
+  if (!nome) { showErro('Preencha seu nome completo.'); return; }
+  if (!email || email.indexOf('@') < 0) { showErro('Informe um email válido.'); return; }
+  if (email !== email2) { showErro('Os emails não coincidem.'); return; }
+  if (cpf.replace(/\D/g,'').length < 11) { showErro('CPF inválido.'); return; }
+  if (cel.replace(/\D/g,'').length < 10) { showErro('Celular inválido.'); return; }
 
-    setTimeout(() => {
-      new QRCode(document.getElementById('qrcode'), {
-        text: payload,
+  var pixCode = gerarPix();
+  mostrarPix(pixCode, email);
+}
+
+function mostrarPix(pixCode, email) {
+  var html = '<div style="text-align:center;">';
+  html += '<div style="font-size:15px;font-weight:700;color:#111;margin-bottom:6px;">Pague com PIX</div>';
+  html += '<div style="font-size:12px;color:#888;margin-bottom:12px;">Escaneie o QR Code ou copie o código</div>';
+  html += '<div id="qrDiv" style="display:flex;justify-content:center;margin-bottom:14px;"></div>';
+  html += '<div style="background:#f5f5f5;border-radius:8px;padding:10px;margin-bottom:12px;">';
+  html += '<div id="pixTxt" style="font-size:9px;color:#555;word-break:break-all;line-height:1.5;">' + pixCode + '</div>';
+  html += '</div>';
+  html += '<button id="btnCopiar" onclick="copiarPix()" style="width:100%;background:#32bcad;color:#fff;border:none;border-radius:8px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;margin-bottom:10px;">📋 Copiar código PIX</button>';
+  html += '<a href="https://wa.me/' + WHATSAPP + '" target="_blank" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:11px;background:#25D366;color:#fff;font-size:13px;font-weight:700;border-radius:8px;text-decoration:none;">💬 Suporte via WhatsApp</a>';
+  html += '<div style="font-size:11px;color:#aaa;margin-top:10px;">Acesso enviado para: <strong>' + email + '</strong></div>';
+  html += '</div>';
+
+  abrirModal(html);
+
+  setTimeout(function() {
+    if (typeof QRCode !== 'undefined') {
+      new QRCode(document.getElementById('qrDiv'), {
+        text: pixCode,
         width: 180,
         height: 180,
         colorDark: '#111',
         colorLight: '#ffffff'
       });
-    }, 100);
-  }
+    }
+  }, 200);
+}
 
-  let pixPayloadGlobal = '';
-  function showPixModal2(payload, email) {
-    pixPayloadGlobal = payload;
-    showPixModal(payload, email);
-  }
-
-  function copiarPix() {
-    const txt = document.getElementById('pixCodeText').textContent;
-    navigator.clipboard.writeText(txt).then(() => {
-      const btn = document.getElementById('btnCopiar');
-      btn.textContent = '✅ Copiado!';
-      setTimeout(() => { btn.textContent = '📋 Copiar código PIX'; }, 2500);
+function copiarPix() {
+  var txt = document.getElementById('pixTxt').textContent;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(txt).then(function() {
+      document.getElementById('btnCopiar').textContent = '✅ Copiado!';
+      setTimeout(function() {
+        document.getElementById('btnCopiar').textContent = '📋 Copiar código PIX';
+      }, 2500);
     });
+  } else {
+    var el = document.createElement('textarea');
+    el.value = txt;
+    document.body.appendChild(el);
+    el.select();
+    document.execCommand('copy');
+    document.body.removeChild(el);
+    document.getElementById('btnCopiar').textContent = '✅ Copiado!';
+    setTimeout(function() {
+      document.getElementById('btnCopiar').textContent = '📋 Copiar código PIX';
+    }, 2500);
   }
+}
 
-  function abrirWhatsapp() {
-    window.open(`https://wa.me/${WHATSAPP}?text=Ol%C3%A1%2C%20fiz%20o%20pagamento%20do%20Volume%20Rica%202.0%20e%20preciso%20de%20ajuda!`, '_blank');
-  }
+function abrirModal(conteudo) {
+  document.getElementById('modalContent').innerHTML = conteudo;
+  document.getElementById('pixModal').style.display = 'flex';
+}
 
-  function showModal(html) {
-    document.getElementById('modalContent').innerHTML = html;
-    document.getElementById('pixModal').style.display = 'flex';
-  }
+function closeModal() {
+  document.getElementById('pixModal').style.display = 'none';
+}
 
-  function closeModal() {
-    document.getElementById('pixModal').style.display = 'none';
-  }
+function showErro(msg) {
+  var html = '<div style="padding:16px 0;text-align:center;">';
+  html += '<div style="font-size:32px;margin-bottom:10px;">⚠️</div>';
+  html += '<div style="font-size:14px;font-weight:700;color:#e05252;margin-bottom:12px;">' + msg + '</div>';
+  html += '<button onclick="closeModal()" style="background:#c8820a;color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:14px;cursor:pointer;">OK</button>';
+  html += '</div>';
+  abrirModal(html);
+}
 
-  function showErro(msg) {
-    showModal(`
-      <div style="padding:20px 0;">
-        <div style="font-size:32px;margin-bottom:12px;">⚠️</div>
-        <div style="font-size:14px;font-weight:700;color:#e05252;margin-bottom:10px;">${msg}</div>
-        <button onclick="closeModal()" style="background:#c8820a;color:#fff;border:none;border-radius:8px;padding:10px 24px;font-size:14px;cursor:pointer;">OK</button>
-      </div>
-    `);
-  }
+function abrirWhatsapp() {
+  window.open('https://wa.me/' + WHATSAPP, '_blank');
+}
 </script>
+
+<!-- MODAL PIX -->
+<div id="pixModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.75);z-index:99999;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:#fff;border-radius:16px;padding:24px 20px;max-width:340px;width:100%;position:relative;max-height:90vh;overflow-y:auto;">
+    <button onclick="closeModal()" style="position:absolute;top:10px;right:14px;background:none;border:none;font-size:22px;cursor:pointer;color:#888;line-height:1;">✕</button>
+    <div id="modalContent"></div>
+  </div>
+</div>
 </body>
 </html>
